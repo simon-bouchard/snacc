@@ -13,9 +13,9 @@ use clap::{Arg, ArgAction, Command};
 static PROCESSED: Lazy<Mutex<HashMap<String, SystemTime>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 fn main() -> notify::Result<()> {
-    let cli = Command::new("notebook_auto_copy")
-    .version("1.0.0")
-    .author("Your Name <you@example.com>")
+    let cli = Command::new("snacc")
+    .version("0.1.0")
+    .author("Simon Bouchard <simon.bouchard@gmail.com>")
     .about("Watches or copies Kaggle notebooks automatically")
     .subcommand_required(true)
     .arg_required_else_help(true)
