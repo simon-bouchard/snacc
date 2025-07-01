@@ -1,82 +1,63 @@
-name: Build and Release Installers
+name: Build Installers
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   build:
-    name: Build for ${{ matrix.target }}
+    name: Build Installers
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            ext: deb
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            ext: tar.gz
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            ext: msi
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
 
       - name: Install dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+        run: sudo apt update && sudo apt install -y dpkg-dev
 
       - name: Install dependencies (macOS)
         if: matrix.os == 'macos-latest'
-        run: brew install pkg-config
+        run: brew install pkgconf
 
-      - name: Install cargo wix (Windows only)
+      - name: Install dependencies (Windows)
         if: matrix.os == 'windows-latest'
         run: cargo install cargo-wix
 
-      - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Build Windows MSI installer
-        if: matrix.os == 'windows-latest'
-        run: cargo wix --verbose
-
-      - name: Check MSI exists (Windows only)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
+      - name: Build installer (.deb)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          if (-Not (Test-Path "target/wix/snacc.msi")) {
-            Write-Error "❌ MSI not found. cargo wix may have failed."
-            exit 1
-          } else {
-            Write-Host "✅ MSI successfully created."
-          }
+          cargo install cargo-deb
+          cargo deb
+          mkdir -p dist
+          cp target/debian/*.deb dist/snacc-installer-linux.deb
 
-      - name: Rename and compress (non-Windows)
-        if: matrix.os != 'windows-latest'
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar -czf snacc-installer-${{ matrix.os }}.${{ matrix.ext }} snacc
-
-      - name: Rename MSI (Windows only)
+      - name: Build installer (.msi)
         if: matrix.os == 'windows-latest'
         run: |
-          mkdir dist
-          copy target/wix/snacc.msi dist/snacc-installer-windows.msi
+          cargo wix init || echo "Already initialized"
+          cargo wix
+          mkdir -p dist
+          cp target/wix/*.msi dist/snacc-installer-windows.msi
+
+      - name: Build installer (.pkg)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cargo install cargo-bundle
+          cargo bundle --release --format pkg
+          mkdir -p dist
+          cp target/release/bundle/pkg/*.pkg dist/snacc-installer-macos.pkg
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: snacc-installers
-          path: |
-            dist/snacc-installer-*
+          name: installers-${{ matrix.os }}
+          path: dist/*
