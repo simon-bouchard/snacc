@@ -101,12 +101,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
-          path: ./dist
+          name: linux-artifact
+          path: dist/linux
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-artifact
+          path: dist/macos
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-artifact
+          path: dist/windows
+
+      - name: Rename all installers to final names
+        run: |
+          mkdir -p dist/final
+          cp dist/linux/*.deb dist/final/snacc-installer-linux.deb
+          cp dist/macos/*.zip dist/final/snacc-installer-macos.zip
+          cp dist/windows/*.msi dist/final/snacc-installer-windows.msi
 
       - name: Upload release artifacts
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/snacc-installer-*
+          files: dist/final/snacc-installer-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
