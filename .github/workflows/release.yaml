@@ -20,45 +20,38 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install dependencies (Linux)
+      - name: Install cargo-deb (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt update && sudo apt install -y libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev squashfs-tools libayatana-appindicator3-dev librsvg2-dev
+        run: cargo install cargo-deb
 
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          rustup component add rustfmt
-          cargo install cargo-wix
-          cargo install cargo-bundle
-
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew update
-          brew install pkg-config cairo pango libpng jpeg giflib librsvg
-          cargo install cargo-bundle
-
-      - name: Build Debian (.deb)
+      - name: Build .deb package
         if: runner.os == 'Linux'
         run: |
-          cargo install cargo-deb
           cargo deb
           mkdir -p dist
           cp target/debian/*.deb dist/snacc-installer-linux.deb
 
-      - name: Build macOS (.app)
-        if: runner.os == 'macOS'
-        run: |
-          cargo bundle --release
-          mkdir -p dist
-          cp -R target/release/bundle/osx/snacc.app dist/snacc-installer-macos.app
+      - name: Install cargo-wix (Windows)
+        if: runner.os == 'Windows'
+        run: cargo install cargo-wix
 
-      - name: Build Windows (.msi)
+      - name: Build .msi package
         if: runner.os == 'Windows'
         run: |
           cargo wix --force
           mkdir -p dist
           cp target/wix/*.msi dist/snacc-installer-windows.msi
+
+      - name: Install cargo-bundle (macOS)
+        if: runner.os == 'macOS'
+        run: cargo install cargo-bundle
+
+      - name: Build .app bundle (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cargo bundle --release
+          mkdir -p dist
+          cp -R target/release/bundle/osx/snacc.app dist/snacc-installer-macos.app
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
