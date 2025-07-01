@@ -34,13 +34,14 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build .pkg with cargo-bundle
+      - name: Build .app with cargo-bundle
         run: |
           brew install pkg-config
           cargo install cargo-bundle
           cargo bundle --release --format osx
           mkdir -p dist
-          cp target/release/bundle/osx/*.dmg dist/snacc-installer-macos.dmg
+          cd target/release/bundle/osx
+          zip -r ../../../dist/snacc-installer-macos.zip snacc.app
 
   build-windows:
     runs-on: windows-latest
