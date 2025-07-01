@@ -3,30 +3,30 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # e.g., v0.1.0
+      - "v*"
 
-permissions:
-  contents: write
+env:
+  BIN_NAME: snacc
 
 jobs:
   build:
-    name: Build and Release Binaries
+    name: Build ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            ext: ''
+            ext: ""
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            ext: '.exe'
+            ext: ".exe"
           - os: macos-latest
             target: x86_64-apple-darwin
-            ext: ''
+            ext: ""
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Rust
@@ -34,33 +34,34 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Build release binary
-        run: |
-          cargo build --release --target ${{ matrix.target }}
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Rename binary
+      - name: Copy binary to dist
         run: |
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/notebook_auto_copy${{ matrix.ext }} dist/notebook_auto_copy-${{ matrix.target }}${{ matrix.ext }}
+          cp target/${{ matrix.target }}/release/${{ env.BIN_NAME }}${{ matrix.ext }} dist/${{ env.BIN_NAME }}-${{ matrix.target }}${{ matrix.ext }}
 
-      - name: Upload binary as artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: notebook_auto_copy-${{ matrix.target }}
-          path: dist/notebook_auto_copy-${{ matrix.target }}${{ matrix.ext }}
+          name: ${{ env.BIN_NAME }}-${{ matrix.target }}
+          path: dist/${{ env.BIN_NAME }}-${{ matrix.target }}${{ matrix.ext }}
 
   release:
     name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
+          merge-multiple: true
 
-      - name: Publish GitHub release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/**/*
+          files: dist/*
