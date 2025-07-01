@@ -1,63 +1,86 @@
-name: Build Installers
+name: Release
 
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
 jobs:
   build:
-    name: Build Installers
+    name: Build and Upload Installers
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
 
-      - name: Install dependencies (Linux)
+      - name: Install dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt update && sudo apt install -y dpkg-dev
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.0-dev libgtk-3-dev libssl-dev libappindicator3-dev librsvg2-dev pkg-config
 
-      - name: Install dependencies (macOS)
-        if: matrix.os == 'macos-latest'
-        run: brew install pkgconf
+      - name: Install cargo-deb (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo install cargo-deb
 
-      - name: Install dependencies (Windows)
+      - name: Build .deb (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cargo deb
+          mkdir -p dist
+          cp target/debian/snacc_*.deb dist/snacc-installer-linux.deb
+
+      - name: Install cargo-wix (Windows)
         if: matrix.os == 'windows-latest'
         run: cargo install cargo-wix
 
-      - name: Build installer (.deb)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          cargo install cargo-deb
-          cargo deb
-          mkdir -p dist
-          cp target/debian/*.deb dist/snacc-installer-linux.deb
-
-      - name: Build installer (.msi)
+      - name: Build .msi (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          cargo wix init || echo "Already initialized"
+          cargo wix init --force
           cargo wix
           mkdir -p dist
-          cp target/wix/*.msi dist/snacc-installer-windows.msi
+          cp target/wix/snacc-*.msi dist/snacc-installer-windows.msi
 
-      - name: Build installer (.pkg)
+      - name: Install cargo-bundle (macOS)
+        if: matrix.os == 'macos-latest'
+        run: cargo install cargo-bundle
+
+      - name: Build .pkg (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          cargo install cargo-bundle
-          cargo bundle --release --format pkg
+          cargo bundle --format osx
           mkdir -p dist
-          cp target/release/bundle/pkg/*.pkg dist/snacc-installer-macos.pkg
+          cp target/release/bundle/osx/snacc.app dist/snacc-installer-macos.app
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.os }}
           path: dist/*
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            installers-ubuntu-latest/snacc-installer-linux.deb
+            installers-windows-latest/snacc-installer-windows.msi
+            installers-macos-latest/snacc-installer-macos.app
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
