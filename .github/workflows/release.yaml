@@ -5,6 +5,9 @@ on:
     tags:
       - '*'
 
+permissions:
+  contents: write
+
 jobs:
   build-linux:
     runs-on: ubuntu-latest
@@ -25,6 +28,12 @@ jobs:
           mkdir -p dist
           cp target/release/bundle/deb/*.deb dist/snacc-installer-linux.deb
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/
+
   build-macos:
     runs-on: macos-latest
     steps:
@@ -34,14 +43,19 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build .app and zip it
+      - name: Build .app with cargo-bundle
         run: |
           brew install pkg-config
           cargo install cargo-bundle
           cargo bundle --release --format osx
           mkdir -p dist
-          cd target/release/bundle/osx
-          ditto -c -k --sequesterRsrc --keepParent snacc.app ../../../dist/snacc-installer-macos.zip
+          ditto -c -k --sequesterRsrc --keepParent target/release/bundle/osx/snacc.app dist/snacc-installer-macos.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/
 
   build-windows:
     runs-on: windows-latest
@@ -73,6 +87,12 @@ jobs:
             exit 1
           }
           Copy-Item $msi.FullName dist/snacc-installer-windows.msi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/
 
   upload:
     needs: [build-linux, build-macos, build-windows]
