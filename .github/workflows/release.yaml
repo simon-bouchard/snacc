@@ -5,63 +5,68 @@ on:
     tags:
       - "v*"
 
-env:
-  BIN_NAME: snacc
-
 jobs:
-  build:
-    name: Build ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            ext: ""
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            ext: ".exe"
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            ext: ""
-
+  build-linux:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Build binary
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Copy binary to dist
+      - uses: actions/checkout@v4
+      - name: Install dependencies
         run: |
-          mkdir -p dist
-          cp target/${{ matrix.target }}/release/${{ env.BIN_NAME }}${{ matrix.ext }} dist/${{ env.BIN_NAME }}-${{ matrix.target }}${{ matrix.ext }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+          sudo apt update
+          sudo apt install -y dpkg-dev
+          cargo install cargo-deb
+      - name: Build .deb
+        run: cargo deb
+      - name: Rename artifact
+        run: mv target/debian/snacc_*.deb snacc-installer-linux.deb
+      - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.BIN_NAME }}-${{ matrix.target }}
-          path: dist/${{ env.BIN_NAME }}-${{ matrix.target }}${{ matrix.ext }}
+          name: snacc-installer-linux
+          path: snacc-installer-linux.deb
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          cargo install cargo-wix
+      - name: Build .msi
+        run: |
+          cargo wix
+      - name: Rename artifact
+        run: Rename-Item -Path "target\wix\snacc-*.msi" -NewName "snacc-installer-windows.msi"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snacc-installer-windows
+          path: snacc-installer-windows.msi
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build binary
+        run: cargo build --release
+      - name: Package
+        run: tar -czf snacc-installer-macos.tar.gz -C target/release snacc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snacc-installer-macos
+          path: snacc-installer-macos.tar.gz
 
   release:
-    name: Create GitHub Release
-    needs: build
+    needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          path: dist
-          merge-multiple: true
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: |
+            artifacts/snacc-installer-linux/snacc-installer-linux.deb
+            artifacts/snacc-installer-windows/snacc-installer-windows.msi
+            artifacts/snacc-installer-macos/snacc-installer-macos.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
