@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "snacc-lib",
+    "snacc-cli",
+    "snacc-ui"
+]
+
