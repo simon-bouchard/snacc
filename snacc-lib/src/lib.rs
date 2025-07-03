@@ -58,7 +58,7 @@ pub fn run() -> notify::Result<()> {
     Ok(())
 }
 
-fn watch_loop(download_dir: PathBuf, cell_mode: String, delete_file: bool) -> notify::Result<()> {
+pub fn watch_loop(download_dir: PathBuf, cell_mode: String, delete_file: bool) -> notify::Result<()> {
     let mut watcher = RecommendedWatcher::new(
         move |res: Result<notify::Event, notify::Error>| {
             if let Ok(event) = res {
@@ -94,7 +94,7 @@ fn watch_loop(download_dir: PathBuf, cell_mode: String, delete_file: bool) -> no
     }
 }
 
-fn handle_notebook(path: PathBuf, cell_mode: &str, delete_file: bool) {
+pub fn handle_notebook(path: PathBuf, cell_mode: &str, delete_file: bool) {
     println!("📥 Detected: {}", path.display());
 
     std::thread::sleep(Duration::from_secs(1));
@@ -176,7 +176,7 @@ fn handle_notebook(path: PathBuf, cell_mode: &str, delete_file: bool) {
     }
 }
 
-fn get_latest_ipynb(download_dir: &Path) -> Option<PathBuf> {
+pub fn get_latest_ipynb(download_dir: &Path) -> Option<PathBuf> {
     let mut files: Vec<_> = fs::read_dir(download_dir)
         .ok()?
         .filter_map(Result::ok)
