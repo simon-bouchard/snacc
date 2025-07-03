@@ -23,7 +23,7 @@ impl App for SnaccApp {
 
             if ui.button("📋 Copy Latest Notebook").clicked() {
                 match copy_once() {
-                    Ok(msg) => self.status = format!("✅ {}", msg),
+                    Ok(msg) => self.status = msg,
                     Err(e) => self.status = format!("❌ {}", e),
                 }
             }
@@ -35,7 +35,11 @@ impl App for SnaccApp {
 
                     thread::spawn(|| {
                         let dir = dirs::download_dir().unwrap_or(PathBuf::from("."));
-                        let _ = snacc_lib::watch_loop(dir, "code".to_string(), true);
+                        let result = snacc_lib::watch_loop(dir, "code".to_string(), true);
+                        if let Err(err) = result {
+                            // Consider logging to a file or pushing to a channel later
+                            eprintln!("❌ Watch loop error: {}", err);
+                        }
                     });
                 }
             } else {
@@ -51,19 +55,17 @@ impl App for SnaccApp {
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions::default();
     eframe::run_native(
-        "snacc x",                      // title
-        options,                        // window options
-        Box::new(|_cc| Box::new(SnaccApp::default())), // app builder closure
+        "snacc x",
+        options,
+        Box::new(|_cc| Box::new(SnaccApp::default())),
     )
 }
 
 fn copy_once() -> Result<String, String> {
     let dir = dirs::download_dir().ok_or("Downloads folder not found")?;
     if let Some(nb) = snacc_lib::get_latest_ipynb(&dir) {
-        snacc_lib::handle_notebook(nb, "code", true);
-        Ok("Notebook copied to clipboard.".into())
+        snacc_lib::handle_notebook(nb, "code", true)
     } else {
         Err("No notebook found.".into())
     }
 }
-

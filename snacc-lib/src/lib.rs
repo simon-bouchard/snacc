@@ -12,50 +12,54 @@ use clap::{Arg, ArgAction, Command};
 
 static PROCESSED: Lazy<Mutex<HashMap<String, SystemTime>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub fn run() -> notify::Result<()> {
+pub fn run() -> Result<String, String> {
     let cli = Command::new("snacc")
-    .version("0.1.0")
-    .author("Simon Bouchard <simon.bouchard@gmail.com>")
-    .about("Watches or copies Kaggle notebooks automatically")
-    .subcommand_required(true)
-    .arg_required_else_help(true)
-    .subcommand(
-        Command::new("watch")
-            .about("Watches the Downloads folder and copies any new notebook")
-            .arg(Arg::new("keep").long("keep").action(ArgAction::SetTrue).help("Keep the notebook after copying"))
-            .arg(Arg::new("cells").long("cells").default_value("code").value_parser(["code", "markdown", "all"]).help("Which cells to copy")),
-    )
-    .subcommand(
-        Command::new("copy")
-            .about("Copies the latest downloaded notebook once")
-            .arg(Arg::new("keep").long("keep").action(ArgAction::SetTrue).help("Keep the notebook after copying"))
-            .arg(Arg::new("cells").long("cells").default_value("code").value_parser(["code", "markdown", "all"]).help("Which cells to copy")),
-    )
-    .get_matches();
+        .version("0.1.0")
+        .author("Simon Bouchard <simon.bouchard@gmail.com>")
+        .about("Watches or copies Kaggle notebooks automatically")
+        .subcommand_required(true)
+        .arg_required_else_help(true)
+        .subcommand(
+            Command::new("watch")
+                .about("Watches the Downloads folder and copies any new notebook")
+                .arg(Arg::new("keep").long("keep").action(ArgAction::SetTrue).help("Keep the notebook after copying"))
+                .arg(Arg::new("cells").long("cells").default_value("code").value_parser(["code", "markdown", "all"]).help("Which cells to copy")),
+        )
+        .subcommand(
+            Command::new("copy")
+                .about("Copies the latest downloaded notebook once")
+                .arg(Arg::new("keep").long("keep").action(ArgAction::SetTrue).help("Keep the notebook after copying"))
+                .arg(Arg::new("cells").long("cells").default_value("code").value_parser(["code", "markdown", "all"]).help("Which cells to copy")),
+        )
+        .get_matches();
 
-
-    let download_dir = dirs::download_dir().expect("❌ Could not find Downloads folder");
+    let download_dir = dirs::download_dir().ok_or("❌ Could not find Downloads folder")?;
 
     match cli.subcommand() {
         Some(("watch", sub)) => {
             let cell_mode = sub.get_one::<String>("cells").unwrap().to_string();
             let delete_file = !sub.get_flag("keep");
-            println!("👀 Watching: {}", download_dir.display());
-            watch_loop(download_dir, cell_mode, delete_file)?;
+
+            // Don't log to stdout; watch_loop runs silently
+            watch_loop(download_dir, cell_mode, delete_file)
+                .map_err(|e| format!("❌ Watch loop failed: {}", e))?;
+
+            Ok("👀 Watch loop ended (unexpectedly)".to_string())
         }
+
         Some(("copy", sub)) => {
             let cell_mode = sub.get_one::<String>("cells").unwrap().to_string();
             let delete_file = !sub.get_flag("keep");
+
             if let Some(latest) = get_latest_ipynb(&download_dir) {
-                handle_notebook(latest, &cell_mode, delete_file);
+                handle_notebook(latest, &cell_mode, delete_file)
             } else {
-                eprintln!("❌ No .ipynb file found.");
+                Err("❌ No .ipynb file found.".to_string())
             }
         }
+
         _ => unreachable!(),
     }
-
-    Ok(())
 }
 
 pub fn watch_loop(download_dir: PathBuf, cell_mode: String, delete_file: bool) -> notify::Result<()> {
@@ -78,7 +82,9 @@ pub fn watch_loop(download_dir: PathBuf, cell_mode: String, delete_file: bool) -
                             }
 
                             seen.insert(key, modified);
-                            handle_notebook(path.clone(), &cell_mode, delete_file);
+
+                            // Quietly discard the result
+                            let _ = handle_notebook(path.clone(), &cell_mode, delete_file);
                         }
                     }
                 }
@@ -94,34 +100,18 @@ pub fn watch_loop(download_dir: PathBuf, cell_mode: String, delete_file: bool) -
     }
 }
 
-pub fn handle_notebook(path: PathBuf, cell_mode: &str, delete_file: bool) {
-    println!("📥 Detected: {}", path.display());
-
+pub fn handle_notebook(path: PathBuf, cell_mode: &str, delete_file: bool) -> Result<String, String> {
     std::thread::sleep(Duration::from_secs(1));
 
-    let contents = match fs::read_to_string(&path) {
-        Ok(data) => data,
-        Err(e) => {
-            eprintln!("❌ Failed to read: {}", e);
-            return;
-        }
-    };
+    let contents = fs::read_to_string(&path)
+        .map_err(|e| format!("❌ Failed to read: {}", e))?;
 
-    let parsed: Value = match serde_json::from_str(&contents) {
-        Ok(json) => json,
-        Err(e) => {
-            eprintln!("❌ Failed to parse JSON: {}", e);
-            return;
-        }
-    };
+    let parsed: Value = serde_json::from_str(&contents)
+        .map_err(|e| format!("❌ Failed to parse JSON: {}", e))?;
 
-    let cells = match parsed.get("cells").and_then(|v| v.as_array()) {
-        Some(c) => c,
-        None => {
-            eprintln!("⚠️ No 'cells' array found.");
-            return;
-        }
-    };
+    let cells = parsed.get("cells")
+        .and_then(|v| v.as_array())
+        .ok_or("⚠️ No 'cells' array found.")?;
 
     let mut blocks = Vec::new();
 
@@ -146,34 +136,40 @@ pub fn handle_notebook(path: PathBuf, cell_mode: &str, delete_file: bool) {
     }
 
     if blocks.is_empty() {
-        println!("⚠️ No {} blocks found.", cell_mode);
-        return;
+        return Err(format!("⚠️ No {} blocks found.", cell_mode));
     }
 
     let final_output = blocks.join("\n\n");
 
-    let mut ctx = ClipboardContext::new().unwrap();
-    if let Err(e) = ctx.set_contents(final_output) {
-        eprintln!("❌ Failed to copy to clipboard: {}", e);
+    let mut ctx = ClipboardContext::new().map_err(|e| {
+        format!(
+            "❌ Failed to access clipboard: {}{}\n",
+            e,
+            if cfg!(target_os = "linux") {
+                "\n💡 Tip: On Linux, try installing `xclip`, `xsel`, or `wl-clipboard` (e.g., `sudo apt install xclip`)."
+            } else {
+                ""
+            }
+        )
+    })?;
 
-        #[cfg(target_os = "linux")]
-        eprintln!("💡 Tip: On Linux, try installing `xclip`, `xsel`, or `wl-clipboard` to enable clipboard access (sudo apt install xclip will work).");
+    ctx.set_contents(final_output).map_err(|e| format!("❌ Failed to copy to clipboard: {}", e))?;
 
-        return;
-    }
-
-
-
-    println!("✅ Copied {} {} cells to clipboard.", blocks.len(), cell_mode);
+    let mut msg = format!("✅ Copied {} {} cells to clipboard.", blocks.len(), cell_mode);
 
     if delete_file {
         std::thread::sleep(Duration::from_millis(500));
-        if let Err(e) = fs::remove_file(&path) {
-            eprintln!("⚠️ Could not delete file: {}", e);
-        } else {
-            println!("🗑️ Deleted: {}", path.display());
+        match fs::remove_file(&path) {
+            Ok(_) => {
+                msg.push_str(&format!("\n🗑️ Deleted: {}", path.display()));
+            }
+            Err(e) => {
+                msg.push_str(&format!("\n⚠️ Could not delete file: {}", e));
+            }
         }
     }
+
+    Ok(msg)
 }
 
 pub fn get_latest_ipynb(download_dir: &Path) -> Option<PathBuf> {
