@@ -1,22 +1,22 @@
 # snacc
 
 **snacc** is a lightweight CLI tool that automatically copies cells from recently downloaded Kaggle notebooks — formatted for LLM-friendly pasting into tools like ChatGPT, Copilot, or your own prompts.
-
-It’s built to eliminate the repetitive copy-paste work from `.ipynb` files and streamline your workflow.
+It’s built to eliminate the repetitive copy-paste work from .ipynb files and streamline your workflow.
 
 ---
 
 ## Features
 
-- Automatically watches your Downloads folder for new Kaggle notebooks
-- One-shot mode to copy the most recent notebook manually
-- Deletes notebooks after copying (enabled by default — can be disabled)
-- Choose which cells to copy:
+- Watches your Downloads folder and automatically copies the latest Kaggle notebook  
+  *(watch mode is the default; does not currently work on WSL)*
+- One-shot command to copy the most recently downloaded notebook
+- Deletes the notebook after copying (enabled by default; can be disabled)
+- Choose which cell types to copy:
   - `--code` (default)
   - `--markdown`
   - `--all`
-- Automatically formats content in a clean, copy-ready way
-- Cross-platform support (Linux, macOS, Windows — note: `watch` does not work on WSL for now)
+- Outputs cells in a clean, LLM-friendly format for copy-paste
+- Works on Windows, macOS, and Linux
 
 ---
 
@@ -24,15 +24,19 @@ It’s built to eliminate the repetitive copy-paste work from `.ipynb` files and
 
 ### Option 1: Prebuilt release (recommended)
 
-Download the latest version from the [Releases page](https://github.com/yourusername/snacc/releases):
+Download from the [Releases page](https://github.com/yourusername/snacc/releases):
 
-- **Installers available**:
+- Installers:
   - Windows (`.msi`)
   - Linux (`.deb`)
-- **Manual binaries**:
-  - `.zip` files for Linux, macOS, and Windows
+- Binaries:
+  - `.zip` archives for Windows, Linux, and macOS
 
-Unzip or install as appropriate, then run `snacc --help` to get started.
+Then run:
+
+```bash
+snacc --help
+```
 
 ### Option 2: Build from source
 
@@ -41,3 +45,33 @@ git clone https://github.com/yourusername/snacc.git
 cd snacc
 cargo build --release
 ./target/release/snacc --help
+```
+
+Requires [Rust](https://www.rust-lang.org/tools/install) and Cargo.
+
+---
+
+## Coming soon
+
+- GUI version (`snacc x`) with:
+  - Keyboard shortcuts
+  - Clipboard preview
+- Option to send directly into a local LLM or copilot interface
+
+---
+
+## Why?
+
+If you often have to copy-paste code cells from Kaggle (or any) notebooks into ChatGPT, `snacc` automates that process. Just activate the watcher, download the notebook, and the cells are copied to your clipboard automatically.
+
+---
+
+## Feedback
+
+Open an issue on GitHub or comment on the [Fast.ai forum post](https://forums.fast.ai/t/) to share thoughts or suggestions.
+
+---
+
+## License
+
+MIT
