@@ -12,6 +12,8 @@ use clap::{Arg, ArgAction, Command};
 
 static PROCESSED: Lazy<Mutex<HashMap<String, SystemTime>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
+pub mod tree;
+
 pub fn run() -> Result<String, String> {
     let cli = Command::new("snacc")
         .version("0.1.0")
@@ -30,6 +32,23 @@ pub fn run() -> Result<String, String> {
                 .about("Copies the latest downloaded notebook once")
                 .arg(Arg::new("keep").long("keep").action(ArgAction::SetTrue).help("Keep the notebook after copying"))
                 .arg(Arg::new("cells").long("cells").default_value("code").value_parser(["code", "markdown", "all"]).help("Which cells to copy")),
+        )
+        .subcommand(
+            Command::new("tree")
+                .about("Print the directory tree")
+                .arg(
+                    Arg::new("path")
+                        .short('p')
+                        .long("path")
+                        .help("Path to start from")
+                        .default_value("."),
+                )
+                .arg(
+                    Arg::new("no-copy")
+                        .long("no-copy")
+                        .help("Do not copy the result to the clipboard")
+                        .action(ArgAction::SetTrue),
+                ),
         )
         .get_matches();
 
@@ -56,6 +75,13 @@ pub fn run() -> Result<String, String> {
             } else {
                 Err("❌ No .ipynb file found.".to_string())
             }
+        }
+
+        Some(("tree", sub)) => {
+            let path = sub.get_one::<String>("path").unwrap();
+            let copy = !sub.get_flag("no-copy");
+            tree::generate_tree(path, copy);
+            Ok("".to_string())
         }
 
         _ => unreachable!(),
