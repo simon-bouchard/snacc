@@ -10,7 +10,7 @@ name = "snacc"
 identifier = "com.snacc.cli"
 version = "0.1.1"
 short_description = "Snacc CLI"
-long_description = "A tool that copies and organizes Kaggle notebooks and prints project trees."
+long_description = "A CLI tool that copies notebooks and prints project trees in LLM friendly format."
 
 [dependencies]
 snacc-lib = { path = "../snacc-lib" }
