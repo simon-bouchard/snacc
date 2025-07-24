@@ -2,6 +2,13 @@
 name = "snacc"
 version = "0.1.1"
 edition = "2021"
+authors = ["Simon Bouchard <simon.bouchard@gmail.com>"]
+
+[package.metadata.wix]
+upgrade-guid = "272C0293-9E33-441F-AA4E-9D7C97285F4C"
+path-guid = "8EF0D42B-CF88-4AA2-B7DE-5DF598543435"
+license = false
+eula = false
 
 [dependencies]
 snacc-lib = { path = "snacc-lib" }
@@ -12,3 +19,8 @@ members = [
     "snacc-lib", 
     "snacc-cli",
 ]
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
