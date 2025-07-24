@@ -1,7 +1,0 @@
-[workspace]
-resolver = "2"
-members = [
-    "snacc-lib",
-    "snacc-cli",
-    #"snacc-x"
-]
