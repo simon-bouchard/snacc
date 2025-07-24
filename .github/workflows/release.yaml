@@ -22,7 +22,7 @@ jobs:
         working-directory: ./snacc-cli
         run: |
           cargo install cargo-bundle
-          cargo bundle -p snacc-cli --release --format deb
+          cargo bundle -p snacc-cli --profile release --format deb
           mkdir -p dist
           cp target/release/bundle/deb/*.deb dist/snacc-installer-linux.deb
 
@@ -46,6 +46,9 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-bundle
+        run: cargo install cargo-bundle
 
       - name: Build .app with cargo-bundle
         working-directory: ./snacc-cli
