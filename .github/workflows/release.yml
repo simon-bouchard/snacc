@@ -67,15 +67,34 @@ jobs:
 
     - name: Package binary (Windows)
       if: matrix.os == 'windows-latest'
+      shell: bash
       run: |
-        cd target/${{ matrix.target }}/release
-        7z a ../../../${{ matrix.name }} snacc-cli.exe
+        # Check both possible locations
+        if [ -f "target/${{ matrix.target }}/release/snacc-cli.exe" ]; then
+          cd target/${{ matrix.target }}/release
+          7z a ../../../${{ matrix.name }} snacc-cli.exe
+        elif [ -f "snacc-cli/target/${{ matrix.target }}/release/snacc-cli.exe" ]; then
+          cd snacc-cli/target/${{ matrix.target }}/release
+          7z a ../../../../${{ matrix.name }} snacc-cli.exe
+        else
+          echo "Binary not found in either location!"
+          exit 1
+        fi
         
     - name: Package binary (Unix)
       if: matrix.os != 'windows-latest'
       run: |
-        cd target/${{ matrix.target }}/release
-        tar czf ../../../${{ matrix.name }} snacc-cli
+        # Check both possible locations
+        if [ -f "target/${{ matrix.target }}/release/snacc-cli" ]; then
+          cd target/${{ matrix.target }}/release
+          tar czf ../../../${{ matrix.name }} snacc-cli
+        elif [ -f "snacc-cli/target/${{ matrix.target }}/release/snacc-cli" ]; then
+          cd snacc-cli/target/${{ matrix.target }}/release
+          tar czf ../../../../${{ matrix.name }} snacc-cli
+        else
+          echo "Binary not found in either location!"
+          exit 1
+        fi
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
