@@ -79,13 +79,13 @@ jobs:
 
     - name: Create installer (Windows MSI)
       if: matrix.platform.installer == 'msi'
-      working-directory: ./snacc-cli
       run: |
-        # Create wix configuration if it doesn't exist
-        if (!(Test-Path "wix")) {
-          cargo wix init --force
+        # Initialize wix from workspace root, specifying the package
+        if (!(Test-Path "snacc-cli/wix")) {
+          cargo wix init --package snacc-cli --force
         }
-        cargo wix --target ${{ matrix.platform.target }} --output ../target/wix/
+        # Build MSI from workspace root, specifying package and target
+        cargo wix --package snacc-cli --target ${{ matrix.platform.target }} --output target/wix/
 
     - name: Create installer (Linux DEB)
       if: matrix.platform.installer == 'deb'
