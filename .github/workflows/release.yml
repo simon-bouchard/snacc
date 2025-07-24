@@ -45,6 +45,7 @@ jobs:
       run: cargo build --release --target ${{ matrix.target }}
 
     - name: Debug - Complete directory structure
+      shell: bash
       run: |
         echo "=== Current directory ==="
         pwd
