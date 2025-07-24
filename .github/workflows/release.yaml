@@ -46,8 +46,7 @@ jobs:
         sudo apt-get install -y libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
 
     - name: Build binary
-      working-directory: ./snacc-cli
-      run: cargo build --release --target ${{ matrix.target }}
+      run: cargo build --release --target ${{ matrix.target }} --bin snacc-cli
 
     - name: Create archive
       shell: bash
@@ -117,8 +116,7 @@ jobs:
       run: cargo install cargo-bundle
 
     - name: Build DEB
-      working-directory: ./snacc-cli
-      run: cargo bundle --release --target x86_64-unknown-linux-gnu --format deb
+      run: cargo bundle --release --target x86_64-unknown-linux-gnu --format deb --manifest-path snacc-cli/Cargo.toml
 
     - name: Upload DEB
       uses: actions/upload-artifact@v4
@@ -148,8 +146,7 @@ jobs:
       run: cargo install cargo-bundle
 
     - name: Build APP
-      working-directory: ./snacc-cli
-      run: cargo bundle --release --target ${{ matrix.target }}
+      run: cargo bundle --release --target ${{ matrix.target }} --manifest-path snacc-cli/Cargo.toml
 
     - name: Upload APP
       uses: actions/upload-artifact@v4

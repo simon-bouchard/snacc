@@ -1,7 +1,14 @@
+[package]
+name = "snacc"
+version = "0.1.1"
+edition = "2021"
+
+[dependencies]
+snacc-lib = { path = "snacc-lib" }
+
 [workspace]
 resolver = "2"
 members = [
-    "snacc-lib",
+    "snacc-lib", 
     "snacc-cli",
-    #"snacc-x"
 ]
