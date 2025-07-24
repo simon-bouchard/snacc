@@ -75,7 +75,8 @@ jobs:
       run: cargo install cargo-wix
 
     - name: Build binary
-      run: cargo build --release --target ${{ matrix.platform.target }} --package snacc-cli
+      working-directory: ./snacc-cli
+      run: cargo build --release --target ${{ matrix.platform.target }}
 
     - name: Create installer (Windows MSI)
       if: matrix.platform.installer == 'msi'
@@ -101,11 +102,11 @@ jobs:
       shell: bash
       run: |
         binary_name=${{ matrix.platform.bin }}
-        binary_path="target/${{ matrix.platform.target }}/release/${binary_name}"
+        binary_path="snacc-cli/target/${{ matrix.platform.target }}/release/${binary_name}"
         
         if [[ "${{ matrix.platform.archive }}" == "tar.gz" ]]; then
           archive_name="snacc-${{ matrix.platform.target }}.tar.gz"
-          tar czvf "${archive_name}" -C "target/${{ matrix.platform.target }}/release" "${binary_name}"
+          tar czvf "${archive_name}" -C "snacc-cli/target/${{ matrix.platform.target }}/release" "${binary_name}"
         else
           archive_name="snacc-${{ matrix.platform.target }}.zip"
           if [[ "${{ runner.os }}" == "Windows" ]]; then
@@ -135,14 +136,14 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: snacc-installer-linux
-        path: target/${{ matrix.platform.target }}/release/bundle/deb/*.deb
+        path: snacc-cli/target/${{ matrix.platform.target }}/release/bundle/deb/*.deb
 
     - name: Upload installer artifacts (macOS)
       if: matrix.platform.installer == 'app'
       uses: actions/upload-artifact@v4
       with:
         name: snacc-installer-macos-${{ matrix.platform.target }}
-        path: target/${{ matrix.platform.target }}/release/bundle/osx/*.app
+        path: snacc-cli/target/${{ matrix.platform.target }}/release/bundle/osx/*.app
 
   release:
     name: Create Release
