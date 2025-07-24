@@ -4,6 +4,9 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build ${{ matrix.target }}
@@ -116,10 +119,20 @@ jobs:
       with:
         path: artifacts
 
+    - name: Debug - Check downloaded artifacts
+      run: |
+        echo "=== Artifacts directory structure ==="
+        find artifacts -type f -name "*.tar.gz" -o -name "*.zip" | head -20
+        echo
+        echo "=== All files in artifacts ==="
+        find artifacts -type f | head -20
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: artifacts/*/*.tar.gz artifacts/*/*.zip
+        files: |
+          artifacts/**/*.tar.gz
+          artifacts/**/*.zip
         body: |
           ## Installation
           
