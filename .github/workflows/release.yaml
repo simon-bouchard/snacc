@@ -19,9 +19,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
 
       - name: Build .deb with cargo-bundle
+        working-directory: ./snacc-cli
         run: |
           cargo install cargo-bundle
-          cargo bundle --release --format deb
+          cargo bundle -p snacc-cli --release --format deb
           mkdir -p dist
           cp target/release/bundle/deb/*.deb dist/snacc-installer-linux.deb
 
@@ -47,9 +48,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build .app with cargo-bundle
+        working-directory: ./snacc-cli
         run: |
           brew install pkg-config
-          cargo install cargo-bundle
+          cargo bundle -p snacc-cli --release --format osx
           cargo bundle --release --format osx
           mkdir -p dist
           cp -R target/release/bundle/osx/snacc.app dist/snacc-macos.app
@@ -80,11 +82,11 @@ jobs:
       - name: Generate .wxs if needed
         run: |
           if (-not (Test-Path "wix/main.wxs")) {
-            cargo wix init
+            cargo wix init --package snacc-cli
           }
 
       - name: Build .msi with cargo-wix
-        run: cargo wix
+        run: cargo wix --package snacc-cli
 
       - name: Build release binary (.exe)
         run: cargo build --release
