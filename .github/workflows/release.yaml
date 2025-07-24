@@ -22,7 +22,7 @@ jobs:
         working-directory: ./snacc-cli
         run: |
           cargo install cargo-bundle
-          cargo bundle -p snacc-cli --profile release --format deb
+          cargo bundle -p snacc-cli --profile release --format deb  # for Linux
           mkdir -p dist
           cp target/release/bundle/deb/*.deb dist/snacc-installer-linux.deb
 
@@ -54,8 +54,7 @@ jobs:
         working-directory: ./snacc-cli
         run: |
           brew install pkg-config
-          cargo bundle -p snacc-cli --release --format osx
-          cargo bundle --release --format osx
+          cargo bundle -p snacc-cli --profile release --format osx  # for macOS
           mkdir -p dist
           cp -R target/release/bundle/osx/snacc.app dist/snacc-macos.app
 
@@ -81,6 +80,9 @@ jobs:
 
       - name: Install cargo-wix
         run: cargo install cargo-wix
+
+      - name: Install WiX Toolset
+        run: choco install wixtoolset
 
       - name: Generate .wxs if needed
         run: |
