@@ -44,27 +44,17 @@ jobs:
       working-directory: ./snacc-cli
       run: cargo build --release --target ${{ matrix.target }}
 
-    - name: Debug - Show directory structure
-      run: |
-        echo "Current directory:"
-        pwd
-        echo "Contents:"
-        find . -name "snacc-cli*" -type f 2>/dev/null || true
-        echo "Target directory structure:"
-        ls -la snacc-cli/target/ 2>/dev/null || echo "No snacc-cli/target"
-        ls -la target/ 2>/dev/null || echo "No target"
-
     - name: Package binary (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        cd snacc-cli/target/${{ matrix.target }}/release
-        7z a ../../../../${{ matrix.name }} snacc-cli.exe
+        cd target/${{ matrix.target }}/release
+        7z a ../../../${{ matrix.name }} snacc-cli.exe
         
     - name: Package binary (Unix)
       if: matrix.os != 'windows-latest'
       run: |
-        cd snacc-cli/target/${{ matrix.target }}/release
-        tar czf ../../../../${{ matrix.name }} snacc-cli
+        cd target/${{ matrix.target }}/release
+        tar czf ../../../${{ matrix.name }} snacc-cli
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
