@@ -89,11 +89,13 @@ jobs:
 
     - name: Create installer (Linux DEB)
       if: matrix.platform.installer == 'deb'
-      run: cargo bundle --release --target ${{ matrix.platform.target }} --package snacc-cli --format deb
+      working-directory: ./snacc-cli
+      run: cargo bundle --release --target ${{ matrix.platform.target }} --format deb
 
     - name: Create installer (macOS APP)
       if: matrix.platform.installer == 'app'
-      run: cargo bundle --release --target ${{ matrix.platform.target }} --package snacc-cli
+      working-directory: ./snacc-cli
+      run: cargo bundle --release --target ${{ matrix.platform.target }}
 
     - name: Create archive
       shell: bash
