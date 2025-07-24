@@ -3,15 +3,9 @@ name: Release
 on:
   push:
     tags: ["v*"]
-  pull_request:
-    branches: [main]
-
-env:
-  CARGO_TERM_COLOR: always
 
 jobs:
-  # Simple binary builds for all platforms
-  build-binaries:
+  build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     
@@ -20,19 +14,20 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            bin: snacc-cli
+            name: snacc-cli-linux-x64.tar.gz
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            bin: snacc-cli.exe
+            name: snacc-cli-windows-x64.zip
           - target: x86_64-apple-darwin
             os: macos-latest
-            bin: snacc-cli
+            name: snacc-cli-macos-x64.tar.gz
           - target: aarch64-apple-darwin
             os: macos-latest
-            bin: snacc-cli
+            name: snacc-cli-macos-arm64.tar.gz
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
@@ -48,149 +43,59 @@ jobs:
     - name: Build binary
       run: cargo build --release --target ${{ matrix.target }} --bin snacc-cli
 
-    - name: Create archive
-      shell: bash
+    - name: Package binary (Windows)
+      if: matrix.os == 'windows-latest'
       run: |
-        cd snacc-cli/target/${{ matrix.target }}/release/
-        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-          7z a ../../../../snacc-${{ matrix.target }}.zip ${{ matrix.bin }}
-        else
-          tar czvf ../../../../snacc-${{ matrix.target }}.tar.gz ${{ matrix.bin }}
-        fi
-
-    - name: Upload binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: snacc-${{ matrix.target }}
-        path: snacc-${{ matrix.target }}.*
-
-  # Windows MSI installer
-  build-windows-msi:
-    name: Build Windows MSI
-    runs-on: windows-latest
-    needs: build-binaries
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: x86_64-pc-windows-msvc
-
-    - name: Install cargo-wix
-      run: cargo install cargo-wix
-
-    - name: Initialize WiX (from workspace root)
-      run: cargo wix init --package snacc-cli --force
-
-    - name: Build MSI (from workspace root)
-      run: cargo wix --package snacc-cli --target x86_64-pc-windows-msvc
-
-    - name: Upload MSI
-      uses: actions/upload-artifact@v4
-      with:
-        name: snacc-windows-msi
-        path: target/wix/*.msi
-
-  # Linux DEB package
-  build-linux-deb:
-    name: Build Linux DEB
-    runs-on: ubuntu-latest
-    needs: build-binaries
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: x86_64-unknown-linux-gnu
-
-    - name: Install dependencies
+        cd target/${{ matrix.target }}/release
+        7z a ../../../${{ matrix.name }} snacc-cli.exe
+        
+    - name: Package binary (Unix)
+      if: matrix.os != 'windows-latest'
       run: |
-        sudo apt-get update
-        sudo apt-get install -y libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+        cd target/${{ matrix.target }}/release
+        tar czf ../../../${{ matrix.name }} snacc-cli
 
-    - name: Install cargo-bundle
-      run: cargo install cargo-bundle
-
-    - name: Build DEB
-      run: cargo bundle --release --target x86_64-unknown-linux-gnu --format deb --manifest-path snacc-cli/Cargo.toml
-
-    - name: Upload DEB
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: snacc-linux-deb
-        path: snacc-cli/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+        name: ${{ matrix.target }}
+        path: ${{ matrix.name }}
 
-  # macOS APP bundles
-  build-macos-app:
-    name: Build macOS APP (${{ matrix.target }})
-    runs-on: macos-latest
-    needs: build-binaries
-    
-    strategy:
-      matrix:
-        target: [x86_64-apple-darwin, aarch64-apple-darwin]
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: ${{ matrix.target }}
-
-    - name: Install cargo-bundle
-      run: cargo install cargo-bundle
-
-    - name: Build APP
-      run: cargo bundle --release --target ${{ matrix.target }} --manifest-path snacc-cli/Cargo.toml
-
-    - name: Upload APP
-      uses: actions/upload-artifact@v4
-      with:
-        name: snacc-macos-app-${{ matrix.target }}
-        path: snacc-cli/target/${{ matrix.target }}/release/bundle/osx/*.app
-
-  # Create GitHub release
   release:
     name: Create Release
-    needs: [build-binaries, build-windows-msi, build-linux-deb, build-macos-app]
+    needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
     
     steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
         path: artifacts
 
-    - name: Display structure
-      run: find artifacts -type f
-
-    - name: Create GitHub release
+    - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: artifacts/**/*
+        files: artifacts/*/*.tar.gz artifacts/*/*.zip
         body: |
           ## Installation
           
-          ### Windows
-          - **MSI Installer**: Download and run the `.msi` file
-          - **Portable**: Download `snacc-x86_64-pc-windows-msvc.zip` and extract
+          1. Download the appropriate archive for your platform
+          2. Extract the binary: `tar -xzf snacc-cli-*.tar.gz` (or unzip on Windows)
+          3. Move the binary to a directory in your PATH
           
-          ### macOS
-          - **APP Bundle**: Download the appropriate `.app` for your architecture and drag to Applications
-          - **Portable**: Download the appropriate `.tar.gz` and extract to your PATH
+          ## Platforms
+          - `snacc-cli-linux-x64.tar.gz` - Linux x86_64
+          - `snacc-cli-windows-x64.zip` - Windows x86_64  
+          - `snacc-cli-macos-x64.tar.gz` - macOS Intel
+          - `snacc-cli-macos-arm64.tar.gz` - macOS Apple Silicon
           
-          ### Linux
-          - **DEB Package**: `sudo dpkg -i snacc_*.deb`
-          - **Portable**: Download `snacc-x86_64-unknown-linux-gnu.tar.gz` and extract to your PATH
-          
-          ## Changes
-          See commit history for changes in this release.
+          ## Usage
+          ```bash
+          snacc-cli --help
+          ```
         draft: false
         prerelease: false
       env:
