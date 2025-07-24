@@ -41,19 +41,19 @@ jobs:
         sudo apt-get install -y libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
 
     - name: Build binary
-      run: cargo build --release --target ${{ matrix.target }} --bin snacc-cli
+      run: cargo build --release --target ${{ matrix.target }} --bin snacc
 
     - name: Package binary (Windows)
       if: matrix.os == 'windows-latest'
       run: |
         cd target/${{ matrix.target }}/release
-        7z a ../../../${{ matrix.name }} snacc-cli.exe
+        7z a ../../../${{ matrix.name }} snacc.exe
         
     - name: Package binary (Unix)
       if: matrix.os != 'windows-latest'
       run: |
         cd target/${{ matrix.target }}/release
-        tar czf ../../../${{ matrix.name }} snacc-cli
+        tar czf ../../../${{ matrix.name }} snacc
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
