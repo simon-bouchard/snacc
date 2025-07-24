@@ -75,7 +75,7 @@ jobs:
       run: cargo install cargo-wix
 
     - name: Build binary
-      run: cargo build --release --target ${{ matrix.platform.target }} --bin snacc-cli
+      run: cargo build --release --target ${{ matrix.platform.target }} --package snacc-cli
 
     - name: Create installer (Windows MSI)
       if: matrix.platform.installer == 'msi'
@@ -89,13 +89,11 @@ jobs:
 
     - name: Create installer (Linux DEB)
       if: matrix.platform.installer == 'deb'
-      working-directory: ./snacc-cli
-      run: cargo bundle --release --target ${{ matrix.platform.target }} --format deb
+      run: cargo bundle --release --target ${{ matrix.platform.target }} --package snacc-cli --format deb
 
     - name: Create installer (macOS APP)
       if: matrix.platform.installer == 'app'
-      working-directory: ./snacc-cli
-      run: cargo bundle --release --target ${{ matrix.platform.target }}
+      run: cargo bundle --release --target ${{ matrix.platform.target }} --package snacc-cli
 
     - name: Create archive
       shell: bash
