@@ -2,123 +2,189 @@ name: Release
 
 on:
   push:
-    tags:
-      - '*'
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  build-linux:
+  build:
+    name: Build ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.os }}
+    
+    strategy:
+      matrix:
+        platform:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin: snacc-cli
+            archive: tar.gz
+            installer: deb
+          - name: Windows x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: snacc-cli.exe
+            archive: zip
+            installer: msi
+          - name: macOS x86_64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            bin: snacc-cli
+            archive: tar.gz
+            installer: app
+          - name: macOS ARM64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            bin: snacc-cli
+            archive: tar.gz
+            installer: app
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Cache cargo & target directories
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.platform.target }}
+
+    - name: Install Linux dependencies
+      if: matrix.platform.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+
+    - name: Install cargo-bundle (Linux/macOS)
+      if: matrix.platform.installer == 'deb' || matrix.platform.installer == 'app'
+      run: cargo install cargo-bundle
+
+    - name: Install cargo-wix (Windows)
+      if: matrix.platform.installer == 'msi'
+      run: cargo install cargo-wix
+
+    - name: Build binary
+      run: cargo build --release --target ${{ matrix.platform.target }} --bin snacc-cli
+
+    - name: Create installer (Windows MSI)
+      if: matrix.platform.installer == 'msi'
+      working-directory: ./snacc-cli
+      run: |
+        # Create wix configuration if it doesn't exist
+        if (!(Test-Path "wix")) {
+          cargo wix init --force
+        }
+        cargo wix --target ${{ matrix.platform.target }} --output ../target/wix/
+
+    - name: Create installer (Linux DEB)
+      if: matrix.platform.installer == 'deb'
+      working-directory: ./snacc-cli
+      run: cargo bundle --release --target ${{ matrix.platform.target }} --format deb
+
+    - name: Create installer (macOS APP)
+      if: matrix.platform.installer == 'app'
+      working-directory: ./snacc-cli
+      run: cargo bundle --release --target ${{ matrix.platform.target }}
+
+    - name: Create archive
+      shell: bash
+      run: |
+        binary_name=${{ matrix.platform.bin }}
+        binary_path="target/${{ matrix.platform.target }}/release/${binary_name}"
+        
+        if [[ "${{ matrix.platform.archive }}" == "tar.gz" ]]; then
+          archive_name="snacc-${{ matrix.platform.target }}.tar.gz"
+          tar czvf "${archive_name}" -C "target/${{ matrix.platform.target }}/release" "${binary_name}"
+        else
+          archive_name="snacc-${{ matrix.platform.target }}.zip"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            7z a "${archive_name}" "${binary_path}"
+          else
+            zip "${archive_name}" "${binary_path}"
+          fi
+        fi
+        
+        echo "ARCHIVE_NAME=${archive_name}" >> $GITHUB_ENV
+
+    - name: Upload binary artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: snacc-${{ matrix.platform.target }}
+        path: ${{ env.ARCHIVE_NAME }}
+
+    - name: Upload installer artifacts (Windows)
+      if: matrix.platform.installer == 'msi'
+      uses: actions/upload-artifact@v4
+      with:
+        name: snacc-installer-windows
+        path: target/wix/*.msi
+
+    - name: Upload installer artifacts (Linux)
+      if: matrix.platform.installer == 'deb'
+      uses: actions/upload-artifact@v4
+      with:
+        name: snacc-installer-linux
+        path: target/${{ matrix.platform.target }}/release/bundle/deb/*.deb
+
+    - name: Upload installer artifacts (macOS)
+      if: matrix.platform.installer == 'app'
+      uses: actions/upload-artifact@v4
+      with:
+        name: snacc-installer-macos-${{ matrix.platform.target }}
+        path: target/${{ matrix.platform.target }}/release/bundle/osx/*.app
+
+  release:
+    name: Create Release
+    needs: build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./snacc-cli
-
+    if: startsWith(github.ref, 'refs/tags/v')
+    
     steps:
-      - uses: actions/checkout@v4
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+    - name: Display structure of downloaded files
+      run: ls -la artifacts/
 
-      - name: Install GTK
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
-
-      - name: Install cargo-bundle
-        run: cargo install cargo-bundle
-
-      - name: Build .deb
-        run: |
-          cargo bundle --release --format deb
-          mkdir -p ../dist
-          cp target/release/bundle/deb/*.deb ../dist/snacc-installer-linux.deb
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-artifact
-          path: ../dist/snacc-installer-linux.deb
-
-  build-macos:
-    runs-on: macos-latest
-    defaults:
-      run:
-        working-directory: ./snacc-cli
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install deps and cargo-bundle
-        run: |
-          brew install pkg-config
-          cargo install cargo-bundle
-
-      - name: Build .app
-        run: |
-          cargo bundle --release --format osx
-          mkdir -p ../dist
-          cp -R target/release/bundle/osx/snacc.app ../dist/snacc-macos.app
-          ditto -c -k --sequesterRsrc --keepParent ../dist/snacc-macos.app ../dist/snacc-macos.zip
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-artifact
-          path: ../dist/snacc-macos.zip
-
-  build-windows:
-    runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: ./snacc-cli
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-wix
-        run: cargo install cargo-wix
-
-      - name: Generate .wxs if needed
-        run: |
-          if (-not (Test-Path "wix/main.wxs")) {
-            cargo wix init
-          }
-
-      - name: Build .msi
-        run: cargo wix
-
-      - name: Zip executable
-        run: |
-          mkdir ../dist
-          Compress-Archive -Path target/release/snacc.exe -DestinationPath ../dist/snacc-windows.zip
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-artifact
-          path: |
-            ../dist/snacc-windows.zip
-            target/wix/*.msi
-
-  upload:
-    needs: [build-linux, build-macos, build-windows]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./dist
-
-      - name: Upload release artifacts
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/**/*
-
+    - name: Create GitHub release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/snacc-*/snacc-*
+          artifacts/snacc-installer-*/*
+        body: |
+          ## Installation
+          
+          ### Windows
+          Download and run the `.msi` installer.
+          
+          ### macOS
+          Download the `.app` bundle and drag to Applications folder.
+          
+          ### Linux
+          Download and install the `.deb` package:
+          ```bash
+          sudo dpkg -i snacc_*.deb
+          ```
+          
+          Or download the binary archive and extract to your PATH.
+          
+          ## Changes
+          See commit history for changes in this release.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,16 +1,45 @@
 [package]
 name = "snacc-cli"
 version = "0.1.1"
-edition = "2024"
+edition = "2021"
 authors = ["Simon Bouchard <simon.bouchard@gmail.com>"]
 license = "MIT"
+description = "A CLI tool that copies notebooks and prints project trees in LLM friendly format"
+repository = "https://github.com/simon-bouchard/snacc"
+homepage = "https://github.com/simon-bouchard/snacc"
 
-[package.metadata.bundle]
-name = "snacc"
-identifier = "com.snacc.cli"
-version = "0.1.1"
-short_description = "Snacc CLI"
-long_description = "A CLI tool that copies notebooks and prints project trees in LLM friendly format."
+[[bin]]
+name = "snacc-cli"
+path = "src/main.rs"
 
 [dependencies]
 snacc-lib = { path = "../snacc-lib" }
+
+# Bundle configuration for macOS and Linux
+[package.metadata.bundle]
+name = "Snacc"
+identifier = "com.snacc.cli"
+version = "0.1.1"
+short_description = "Notebook and tree CLI tool"
+long_description = "A CLI tool that copies Kaggle notebooks and prints project trees in LLM friendly format."
+copyright = "Copyright (c) Simon Bouchard 2025"
+category = "Developer Tool"
+authors = ["Simon Bouchard"]
+
+# macOS specific
+osx_minimum_system_version = "10.12"
+
+# Linux specific - for .deb package
+deb_depends = ["xclip | xsel | wl-clipboard"]
+
+# Windows MSI configuration
+[package.metadata.wix]
+upgrade-guid = "f2f89b12-f000-4aad-994f-7661b9f4fa0b"
+path-guid = "8a20d97c-ca27-4a00-8b64-e5d735e4c072"
+license = false
+eula = false
+banner = false
+dialog = false
+manufacturer = "Simon Bouchard"
+product_name = "Snacc CLI"
+description = "A CLI tool for notebooks and project trees"
