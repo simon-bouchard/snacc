@@ -12,29 +12,25 @@ jobs:
       run:
         working-directory: ./snacc-cli
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
-
-      - name: Install cargo-bundle
-        run: cargo install cargo-bundle
-
-      - name: Build .deb with cargo-bundle
+      - name: Install GTK and bundle
         run: |
-          cargo bundle --release --format deb -p snacc-cli
+          sudo apt-get update && sudo apt-get install -y libgtk-3-dev
+          cargo install cargo-bundle
+
+      - name: Bundle .deb
+        run: |
+          cargo bundle --profile release --format deb
           mkdir -p ../dist
           cp target/release/bundle/deb/*.deb ../dist/snacc-installer-linux.deb
 
-      - name: Zip release binary
+      - name: Zip binary
         run: zip -j ../dist/snacc-linux.zip target/release/snacc
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: linux-artifact
           path: ../dist/*
@@ -45,28 +41,26 @@ jobs:
       run:
         working-directory: ./snacc-cli
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install dependencies
+      - name: Install tools and cargo-bundle
         run: |
           brew install pkg-config
           cargo install cargo-bundle
 
-      - name: Build .app with cargo-bundle
+      - name: Bundle .app
         run: |
-          cargo bundle --release --format osx -p snacc-cli
+          cargo bundle --profile release --format osx
           mkdir -p ../dist
           cp -R target/release/bundle/osx/snacc.app ../dist/snacc-macos.app
 
-      - name: Zip .app directory
-        run: ditto -c -k --sequesterRsrc --keepParent ../dist/snacc-macos.app ../dist/snacc-macos.zip
+      - name: Zip app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent ../dist/snacc-macos.app ../dist/snacc-macos.zip
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: macos-artifact
           path: ../dist/snacc-macos.zip
@@ -77,17 +71,14 @@ jobs:
       run:
         working-directory: ./snacc-cli
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install WiX Toolset
-        run: choco install wixtoolset -y
-
-      - name: Install cargo-wix
-        run: cargo install cargo-wix
+      - name: Install WiX + cargo-wix
+        run: |
+          choco install wixtoolset -y
+          cargo install cargo-wix
 
       - name: Generate .wxs if needed
         run: |
@@ -95,21 +86,20 @@ jobs:
             cargo wix init --package snacc-cli
           }
 
-      - name: Build .msi with cargo-wix
+      - name: Build .msi
         run: cargo wix --package snacc-cli
 
-      - name: Build release binary (.exe)
+      - name: Build binary
         run: cargo build --release
 
-      - name: Copy artifacts (.msi and .zip)
+      - name: Copy artifacts
         run: |
           mkdir ../dist
           $msi = Get-ChildItem -Path target/wix -Filter *.msi | Select-Object -First 1
           Copy-Item $msi.FullName ../dist/snacc-installer-windows.msi
           Compress-Archive -Path target/release/snacc.exe -DestinationPath ../dist/snacc-windows.zip
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
           path: ../dist/*
@@ -118,15 +108,14 @@ jobs:
     needs: [build-linux, build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./dist
 
-      - name: Upload release artifacts
+      - name: Upload GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/**/*
