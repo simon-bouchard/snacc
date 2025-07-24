@@ -3,5 +3,5 @@ resolver = "2"
 members = [
     "snacc-lib",
     "snacc-cli",
-    "snacc-x"
+    #"snacc-x"
 ]
