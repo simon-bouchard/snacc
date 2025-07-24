@@ -44,6 +44,26 @@ jobs:
       working-directory: ./snacc-cli
       run: cargo build --release --target ${{ matrix.target }}
 
+    - name: Debug - Complete directory structure
+      run: |
+        echo "=== Current directory ==="
+        pwd
+        echo
+        echo "=== Root directory contents ==="
+        ls -la
+        echo
+        echo "=== Find all snacc-cli binaries ==="
+        find . -name "snacc-cli*" -type f 2>/dev/null || echo "No snacc-cli files found"
+        echo
+        echo "=== Target directory structure ==="
+        find target -type f -name "*snacc*" 2>/dev/null || echo "No target directory or snacc files in target"
+        echo
+        echo "=== snacc-cli directory contents ==="
+        ls -la snacc-cli/ 2>/dev/null || echo "No snacc-cli directory"
+        echo
+        echo "=== snacc-cli/target contents if exists ==="
+        find snacc-cli/target -type f 2>/dev/null || echo "No snacc-cli/target directory"
+
     - name: Package binary (Windows)
       if: matrix.os == 'windows-latest'
       run: |
