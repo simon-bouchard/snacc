@@ -10,107 +10,127 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./snacc-cli
+        working-directory: ./
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Install GTK and cargo-bundle
+      - name: Install cargo-bundle dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
+
+      - name: Install cargo-bundle
+        run: cargo install cargo-bundle
+
+      - name: Build .deb with cargo-bundle
         run: |
-          sudo apt-get update && sudo apt-get install -y libgtk-3-dev
-          cargo install cargo-bundle
+          cargo bundle --profile release --format deb --manifest-path snacc-cli/Cargo.toml
+          mkdir -p dist
+          cp snacc-cli/target/release/bundle/deb/*.deb dist/snacc-installer-linux.deb
 
-      - name: Bundle .deb and zip
+      - name: Zip release binary
         run: |
-          cargo bundle --profile release --format deb
-          mkdir -p ../dist
-          cp target/release/bundle/deb/*.deb ../dist/snacc-installer-linux.deb
-          zip -j ../dist/snacc-linux.zip target/release/snacc
+          mkdir -p dist
+          cp snacc-cli/target/release/snacc dist/snacc-linux
+          zip -j dist/snacc-linux.zip dist/snacc-linux
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: linux-artifact
-          path: ../dist/*
+          path: dist/*
 
   build-macos:
     runs-on: macos-latest
     defaults:
       run:
-        working-directory: ./snacc-cli
+        working-directory: ./
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Install tools
+      - name: Install cargo-bundle
+        run: brew install pkg-config && cargo install cargo-bundle
+
+      - name: Build .app with cargo-bundle
         run: |
-          brew install pkg-config
-          cargo install cargo-bundle
+          cargo bundle --profile release --format osx --manifest-path snacc-cli/Cargo.toml
+          mkdir -p dist
+          cp -R snacc-cli/target/release/bundle/osx/snacc.app dist/snacc-macos.app
 
-      - name: Bundle .app and zip
+      - name: Zip .app directory
         run: |
-          cargo bundle --profile release --format osx
-          mkdir -p ../dist
-          cp -R target/release/bundle/osx/snacc.app ../dist/snacc-macos.app
-          ditto -c -k --sequesterRsrc --keepParent ../dist/snacc-macos.app ../dist/snacc-macos.zip
+          ditto -c -k --sequesterRsrc --keepParent dist/snacc-macos.app dist/snacc-macos.zip
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: macos-artifact
-          path: ../dist/snacc-macos.zip
+          path: dist/*
 
   build-windows:
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: ./snacc-cli
+        shell: pwsh
+        working-directory: ./
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Install WiX + cargo-wix
+      - name: Install cargo-wix
+        run: cargo install cargo-wix
+
+      - name: Generate .wxs if needed
         run: |
-          choco install wixtoolset -y
-          cargo install cargo-wix
-
-      - name: Generate WiX manifest if needed
-        run: |
-          if (-not (Test-Path "wix/main.wxs")) {
+          if (-not (Test-Path "snacc-cli\wix\main.wxs")) {
+            cd snacc-cli
             cargo wix init
+            cd ..
           }
 
-      - name: Build .msi and zip
+      - name: Build .msi with cargo-wix
+        run: cargo wix --manifest-path snacc-cli/Cargo.toml
+
+      - name: Build release binary (.exe)
+        run: cargo build --release --manifest-path snacc-cli/Cargo.toml
+
+      - name: Copy artifacts (.msi and .zip)
         run: |
-          cargo wix
-          cargo build --release
-          mkdir ../dist
-          $msi = Get-ChildItem -Path target/wix -Filter *.msi | Select-Object -First 1
-          if ($msi -eq $null) {
-            Write-Error "❌ MSI not found."
-            exit 1
-          }
-          Copy-Item $msi.FullName ../dist/snacc-installer-windows.msi
-          Compress-Archive -Path target/release/snacc.exe -DestinationPath ../dist/snacc-windows.zip
+          mkdir -p dist
+          $msi = Get-ChildItem -Path snacc-cli\target\wix -Filter *.msi | Select-Object -First 1
+          Copy-Item $msi.FullName dist/snacc-installer-windows.msi
+          Compress-Archive -Path snacc-cli\target\release\snacc.exe -DestinationPath dist/snacc-windows.zip
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
-          path: ../dist/*
+          path: dist/*
 
   upload:
     needs: [build-linux, build-macos, build-windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./dist
 
-      - name: Upload GitHub Release
+      - name: Upload release artifacts
         uses: softprops/action-gh-release@v2
         with:
           files: dist/**/*
