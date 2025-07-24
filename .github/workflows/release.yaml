@@ -74,9 +74,10 @@ jobs:
       if: matrix.platform.installer == 'msi'
       run: cargo install cargo-wix
 
-    # Build from workspace root using --package flag
+    # Build from snacc-cli directory where the binary target exists
     - name: Build binary
-      run: cargo build --release --target ${{ matrix.platform.target }} --package snacc-cli
+      working-directory: ./snacc-cli
+      run: cargo build --release --target ${{ matrix.platform.target }}
 
     # All installer commands from workspace root with --package flag
     - name: Create installer (Windows MSI)
@@ -101,11 +102,11 @@ jobs:
       shell: bash
       run: |
         binary_name=${{ matrix.platform.bin }}
-        binary_path="target/${{ matrix.platform.target }}/release/${binary_name}"
+        binary_path="snacc-cli/target/${{ matrix.platform.target }}/release/${binary_name}"
         
         if [[ "${{ matrix.platform.archive }}" == "tar.gz" ]]; then
           archive_name="snacc-${{ matrix.platform.target }}.tar.gz"
-          tar czvf "${archive_name}" -C "target/${{ matrix.platform.target }}/release" "${binary_name}"
+          tar czvf "${archive_name}" -C "snacc-cli/target/${{ matrix.platform.target }}/release" "${binary_name}"
         else
           archive_name="snacc-${{ matrix.platform.target }}.zip"
           if [[ "${{ runner.os }}" == "Windows" ]]; then
